@@ -1,0 +1,9 @@
+---
+name: Chainlit Chatbot
+category: Interactive Apps
+subcategory: Servers
+role: batch_connect
+description: |
+  This app will launch a Chatbot implemented with [Chainlit]
+
+  [Chainlit]: https://docs.chainlit.io/get-started/overview

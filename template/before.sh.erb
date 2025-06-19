@@ -1,0 +1,37 @@
+# Note that after.sh, before.sh.erb and script.sh.erb all run
+# inside the container specified in submit.yml.erb.
+
+# Find available port to run server on
+port=$(find_port)
+
+# Generate SHA1 encrypted password
+password="$(create_passwd 16)"
+
+# Get grafana link
+job_stats_link=$(job_stats.py $SLURM_JOB_ID)
+
+export JOBDIR=$(pwd)
+
+# Working directory
+<%
+# Set our working directory.
+working_dir = Pathname.new(context.working_dir)
+
+# Ensure that code-server always starts up in either a user defined directory or the home directory.
+if ! working_dir.exist?
+    working_dir = Pathname.new(ENV['HOME'])
+elsif working_dir.file?
+    working_dir = working_dir.parent
+end
+%>
+
+cd "<%= working_dir.to_s %>"
+
+export VLLM_PORT=$(find_port)
+export VLLM_API_KEY="EMPTY"
+export VLLM_BASE_URL="http://${HOSTNAME}:${VLLM_PORT}/v1"
+
+export CHAINLIT_PORT=${port}
+export CHAINLIT_AUTH_SECRET=${password}
+export ROOT_PATH="node/${HOSTNAME}/${CHAINLIT_PORT}"
+

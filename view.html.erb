@@ -1,0 +1,25 @@
+<!-- Observe some sources online use /rnode/ instead -->
+<%-
+  # generate form id, based on host and port
+  form_id = Digest::SHA1.hexdigest("--" + host.to_s + "--" + port.to_s + "--")
+-%>
+
+<div class="flex-container">
+  <a id="<%= form_id %>" href="/node/<%= host %>/<%= port %>" target="_blank" class="btn btn-primary" onclick="setCookie('<%= form_id %>','<%= password %>',7)">
+    Connect to Chainlit
+  </a>
+  <a href="<%= job_stats_link %>" target="_blank" class="btn btn-info">
+    <i class="fa fa-cogs"></i> Job Statistics
+  </a>
+</div>
+
+<script>
+function setCookie(form_id, cvalue, exdays) {
+    var d = new Date();
+    cname = "_chainlit_token";
+    d.setTime(d.getTime() + (exdays*24*60*60*1000));
+    var expires = "expires="+ d.toUTCString();
+    document.cookie = cname + "=" + cvalue + ";" + expires + "; Path=/; Secure";
+}
+</script>
+

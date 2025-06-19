@@ -1,0 +1,36 @@
+---
+cluster:
+  - "alvis"
+form:
+  - cluster
+  - auto_accounts
+  - bc_num_hours
+  - resource
+  - version
+  - working_dir
+attributes:
+  resource:
+    widget: "select"
+    label: "Resource"
+    options:
+      GPU:
+        - [ "A40:1", "--gpus-per-node=A40:1" ]
+        - [ "A40:2", "--gpus-per-node=A40:2" ]
+        - [ "A40:4", "--gpus-per-node=A40:4" ]
+  version:
+    widget: "select"
+    label: "Runtime"
+    options:
+      User provided:
+        - [ "~/portal/carta/*.sh",  "x", disabled: true ]
+<% glob_prettify_lookup(["#{Dir.home}/portal/chainlit/*.sh"]).each do |pretty_path, path| %>
+        - [ "<%= pretty_path %>", "<%= path %>" ]
+<% end %>
+    help: "See /apps/portal/chainlit/ for examples on how to create your own custom environment"
+  working_dir:
+    widget: "path_selector"
+    label: "Working Directory"
+    data-filepicker: true
+    data-target-file-type: dirs  # Valid values are: files, dirs, or both
+    readonly: false
+    help: "Select your working directory; defaults to $HOME"
