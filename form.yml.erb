@@ -17,6 +17,14 @@ attributes:
         - [ "A40:1", "--gpus-per-node=A40:1" ]
         - [ "A40:2", "--gpus-per-node=A40:2" ]
         - [ "A40:4", "--gpus-per-node=A40:4" ]
+        # - [ "2x A40:4", "-N 2 --gpus-per-node=A40:4" ]
+        - [ "A100:1", "--gpus-per-node=A100:1" ]
+        - [ "A100:2", "--gpus-per-node=A100:2" ]
+        - [ "A100:4", "--gpus-per-node=A100:4" ]
+        # - [ "2x A100:4", "-N 2 --gpus-per-node=A100:4" ]
+        - [ "A100fat:1", "--gpus-per-node=A100fat:1" ]
+        - [ "A100fat:2", "--gpus-per-node=A100fat:2" ]
+        - [ "A100fat:4", "--gpus-per-node=A100fat:4" ]
   version:
     widget: "select"
     label: "Runtime"
