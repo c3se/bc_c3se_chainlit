@@ -1,5 +1,6 @@
 import os
 import pwd
+import sqlite3
 import traceback
 from typing import Dict, List, Any, Optional
 
@@ -8,6 +9,8 @@ from chainlit.input_widget import Select, Switch, Slider
 from openai import AsyncOpenAI
 from mcp import ClientSession
 from mcp.types import CallToolResult, TextContent
+
+from custom_data_layer import CustomDataLayer
 
 client = AsyncOpenAI(base_url=os.getenv("VLLM_BASE_URL"), api_key=os.getenv("VLLM_API_KEY"))
 
@@ -21,11 +24,11 @@ async def start():
     fullname = pwd.getpwnam(username).pw_gecos.split(',')[0]
 
     model = os.getenv("HF_MODEL")
+    modelname = ""
     # find the exact model name for local model snapshot
     if model.startswith("/mimer"):
         for dirname in model.split("/"):
             # trim "models--" prefix for models from HF
-            modelname = ""
             if dirname.startswith("models"):
                 modelname = dirname[8:]
                 break
@@ -51,19 +54,22 @@ async def start():
         ]
     ).send()
 
+    greeting = f"Hi {fullname}! I am your AI assistant on {os.getenv('HOSTNAME')}\n"
     cl.user_session.set(
         "messages",
         [
             {
                 "role": "system",
-                "content": "You are a helpful AI assistant running locally via vLLM. You can access tools using MCP servers.",
+                "content": f"You are a helpful AI assistant running on {os.getenv('HOSTNAME')} via vLLM. You can access tools using MCP servers.",
+            },
+            {
+                "role": "assistant",
+                "content": greeting,
             }
         ],
     )
 
-    await cl.Message(
-        content=f"Hi {fullname}! I am your AI assistant on {os.getenv('HOSTNAME')}\n"
-    ).send()
+    await cl.Message(content=greeting).send()
 
 @cl.header_auth_callback
 def header_auth_callback(headers: Dict) -> Optional[cl.User]:
@@ -78,6 +84,86 @@ def header_auth_callback(headers: Dict) -> Optional[cl.User]:
         with open(f"{os.getenv('JOBDIR')}/chainlit.err", "w") as f:
             f.write(f"{headers}\n")
         return None
+
+@cl.data_layer
+def get_data_layer():
+    db_init_query = """
+    CREATE TABLE IF NOT EXISTS User (
+        "id" UUID PRIMARY KEY,
+        "identifier" TEXT NOT NULL UNIQUE,
+        "metadata" JSONB NOT NULL,
+        "createdAt" TEXT,
+        "updatedAt" TEXT
+    );
+    CREATE TABLE IF NOT EXISTS Thread (
+        "id" UUID PRIMARY KEY,
+        "createdAt" TEXT,
+        "name" TEXT,
+        "userId" UUID,
+        "userIdentifier" TEXT,
+        "tags" TEXT[],
+        "metadata" JSONB,
+        FOREIGN KEY ("userId") REFERENCES users("id") ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS Step (
+        "id" UUID PRIMARY KEY,
+        "threadId" UUID,
+        "parentId" UUID,
+        "input" TEXT,
+        "metadata" JSONB,
+        "name" TEXT,
+        "output" TEXT,
+        "type" TEXT NOT NULL,
+        "createdAt" TEXT,
+        "start" TEXT,
+        "end" TEXT,
+        "showInput" TEXT,
+        "isError" BOOLEAN,
+        FOREIGN KEY ("threadId") REFERENCES threads("id") ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS Element (
+        "id" UUID PRIMARY KEY,
+        "threadId" UUID,
+        "forId" UUID,
+        "type" TEXT,
+        "mime" TEXT,
+        "name" TEXT NOT NULL,
+        "objectKey" TEXT,
+        "url" TEXT,
+        "chainlitKey" TEXT,
+        "display" TEXT,
+        "size" TEXT,
+        "language" TEXT,
+        "page" INT,
+        "props" JSONB,
+        FOREIGN KEY ("threadId") REFERENCES threads("id") ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS Feedback (
+        "id" UUID PRIMARY KEY,
+        "forId" UUID NOT NULL,
+        "name" TEXT NOT NULL,
+        "value" INT NOT NULL,
+        "comment" TEXT
+    );
+    """
+
+    db_dir_path = f"{os.getenv('HOME')}/.ood_chainlit"
+    db_file_name = f"chat_history.sqlite3"
+    db_file_path = f"{db_dir_path}/{db_file_name}"
+
+    os.makedirs(db_dir_path, exist_ok=True)
+    if not os.path.exists(db_file_path):
+        conn = sqlite3.connect(db_file_path)
+        conn.executescript(db_init_query)
+        conn.commit()
+        conn.close()
+
+    return CustomDataLayer(db_file_path)
+
+@cl.on_chat_resume
+async def on_chat_resume(thread):
+    messages = thread["metadata"]["messages"]
+    cl.user_session.set("messages", messages)
 
 @cl.on_mcp_connect
 async def on_mcp_connect(connection, session: ClientSession):
@@ -188,7 +274,7 @@ async def on_message(message: cl.Message):
 
         # Initial message for the first assistant response
         initial_msg = cl.Message(content="")
-        await initial_msg.send()
+        # await initial_msg.send()
 
         mcp_tools = cl.user_session.get("mcp_tools", {})
         all_tools = []
@@ -230,6 +316,7 @@ async def on_message(message: cl.Message):
         # First, update message history with the initial response
         if initial_response.strip():
             messages.append({"role": "assistant", "content": initial_response})
+            await initial_msg.send()
 
         # Process tool calls if any
         if tool_calls:
