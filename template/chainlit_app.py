@@ -4,6 +4,7 @@ import sqlite3
 import traceback
 from typing import Dict, List, Any, Optional
 
+import requests
 import chainlit as cl
 from chainlit.input_widget import Select, Switch, Slider
 from openai import AsyncOpenAI
@@ -23,16 +24,20 @@ async def start():
     username = os.getenv("USER")
     fullname = pwd.getpwnam(username).pw_gecos.split(',')[0]
 
-    model = os.getenv("HF_MODEL")
-    modelname = ""
-    # find the exact model name for local model snapshot
-    if model.startswith("/mimer"):
-        for dirname in model.split("/"):
-            # trim "models--" prefix for models from HF
+    models = await client.models.list()
+    if models:
+        model = models.data[0].id
+    else:
+        await cl.Message(content="No model found. Please check your config and restart").send()
+        return
+
+    modelname = model
+    # If modelname is a local path, find the exact model name
+    if modelname.startswith("/mimer"):
+        for dirname in modelname.split("/"):
             if dirname.startswith("models"):
-                modelname = dirname[8:]
+                modelname = "/".join(dirname.split("--")[1:])
                 break
-    modelname = modelname or model
 
     settings = await cl.ChatSettings(
         [
@@ -54,22 +59,15 @@ async def start():
         ]
     ).send()
 
-    greeting = f"Hi {fullname}! I am your AI assistant on {os.getenv('HOSTNAME')}\n"
     cl.user_session.set(
         "messages",
         [
             {
                 "role": "system",
-                "content": f"You are a helpful AI assistant running on {os.getenv('HOSTNAME')} via vLLM. You can access tools using MCP servers.",
+                "content": f"You are a helpful AI assistant running via vLLM with Chainlit frontend. You can access tools using MCP servers.",
             },
-            {
-                "role": "assistant",
-                "content": greeting,
-            }
         ],
     )
-
-    await cl.Message(content=greeting).send()
 
 @cl.header_auth_callback
 def header_auth_callback(headers: Dict) -> Optional[cl.User]:
