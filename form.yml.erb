@@ -29,8 +29,12 @@ attributes:
     widget: "select"
     label: "Runtime"
     options:
+      System provided:
+<% glob_prettify_lookup(["/apps/portal/chainlit/*.sh"]).each do |pretty_path, path| %>
+        - [ "<%= pretty_path %>", "<%= path %>" ]
+<% end %>
       User provided:
-        - [ "~/portal/carta/*.sh",  "x", disabled: true ]
+        - [ "~/portal/chainlit/*.sh",  "x", disabled: true ]
 <% glob_prettify_lookup(["#{Dir.home}/portal/chainlit/*.sh"]).each do |pretty_path, path| %>
         - [ "<%= pretty_path %>", "<%= path %>" ]
 <% end %>

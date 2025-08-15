@@ -1,0 +1,34 @@
+source "<%= context.version %>"
+
+if [[ -n "$VLLM_SIF" ]]; then
+    echo "Starting server node"
+    apptainer exec $VLLM_SIF \
+        vllm serve ${HF_MODEL} ${vllm_opts} \
+        > $JOBDIR/vllm.out 2> $JOBDIR/vllm.err &
+    sleep 20
+
+    # wait at most 10 min for the model to start, otherwise abort
+    if timeout 600 bash -c "tail -f ${JOBDIR}/vllm.err | grep -q 'Application startup complete'"; then
+        echo "vLLM is running. Starting client"
+    else
+        echo "vLLM doesn't seem to start, aborting"
+        exit
+    fi
+else
+    echo "Connecting to persistent service. Users must overwrite VLLM_BASE_URL"
+    echo VLLM_BASE_URL=$VLLM_BASE_URL
+    # No API_KEY for persistent service
+    export VLLM_API_KEY="EMPTY"
+fi
+
+apptainer exec $CHAINLIT_SIF \
+    chainlit run $JOBDIR/chainlit_app.py \
+        --headless \
+        --host 0.0.0.0 \
+        --port $CHAINLIT_PORT \
+        --root-path "/node/${HOSTNAME}/${CHAINLIT_PORT}" &
+# overwrite SCRIPT_PID variable to let OOD wait the process
+SCRIPT_PID=$!
+
+
+

@@ -28,10 +28,13 @@ end
 cd "<%= working_dir.to_s %>"
 
 export VLLM_PORT=$(find_port)
-export VLLM_API_KEY="EMPTY"
+export VLLM_API_KEY=$(create_passwd 16)
 export VLLM_BASE_URL="http://${HOSTNAME}:${VLLM_PORT}/v1"
 
 export CHAINLIT_PORT=${port}
 export CHAINLIT_AUTH_SECRET=${password}
 export ROOT_PATH="node/${HOSTNAME}/${CHAINLIT_PORT}"
+
+export APPTAINERENV_VLLM_CACHE_ROOT=$TMPDIR/cache
+export APPTAINERENV_VLLM_CONFIG_ROOT=$TMPDIR/config
 
